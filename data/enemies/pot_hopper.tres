@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_data"]
+[ext_resource type="SpriteFrames" path="res://art/enemies/pot_hopper/pot_hopper_frames.tres" id="2_frames"]
+
+[resource]
+script = ExtResource("1_data")
+sprite_frames = ExtResource("2_frames")
+sprite_offset = Vector2(0, -16)
+hurtbox_size = Vector2(14, 14)
+hurtbox_offset = Vector2(0, -13)
+hurt_time = 0.2
+hurt_flash_color = Color(1.6, 1.6, 1.6, 1)

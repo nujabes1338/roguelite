@@ -1,0 +1,22 @@
+Hero Realm tileset: tileset.png, 96x48 px, 16x16 tiles, 6 columns x 3 rows.
+index = row * 6 + col. px = top-left pixel of the tile in tileset.png.
+Collision: ground tiles full 16x16 solid; platform_* one-way (top edge y=0 of tile,
+art occupies rows 0-6); spikes full 16x16 solid + hurtbox, pogo-able (matches scenes/spikes.tscn).
+
+index  col,row       px  name
+    0    0,0      0,0    ground_top_left
+    1    1,0     16,0    ground_top
+    2    2,0     32,0    ground_top_right
+    3    3,0     48,0    platform_left
+    4    4,0     64,0    platform_mid
+    5    5,0     80,0    platform_right
+    6    0,1      0,16   ground_left
+    7    1,1     16,16   ground_fill
+    8    2,1     32,16   ground_right
+    9    3,1     48,16   spikes
+   12    0,2      0,32   ground_bottom_left
+   13    1,2     16,32   ground_bottom
+   14    2,2     32,32   ground_bottom_right
+
+Empty cells: 10, 11, 15, 16, 17 (transparent).
+Autotile: 3x3 block at cols 0-2 = TL T TR / L F R / BL B BR.
