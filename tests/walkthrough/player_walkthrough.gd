@@ -2,7 +2,7 @@ extends Node
 ## Scripted input pass over the greybox room. Injects keyboard and gamepad
 ## events through the InputMap, logs every player state transition, and quits
 ## with exit code 0 only if every state was reached and a pogo bounce landed
-## on a dummy.
+## on each test enemy.
 ## Run: godot --headless --path . res://tests/walkthrough/player_walkthrough.tscn
 
 enum Device { KEYBOARD, GAMEPAD }
@@ -24,11 +24,11 @@ const PAD_BUTTONS := {
 const DEFAULT_TIMEOUT := 240
 
 var _player: Player
-var _dummy_a: DummyEnemy
-var _dummy_b: DummyEnemy
+var _hopper: DummyEnemy
+var _daruma: DummyEnemy
 var _start_frame := 0
 var _reached := {}
-var _dummy_bounces := 0
+var _enemy_bounces := {}
 var _spike_bounces := 0
 var _failed := false
 var _held_direction := 0
@@ -37,10 +37,11 @@ var _held_direction := 0
 func _ready() -> void:
 	Input.use_accumulated_input = false
 	var room := TEST_ROOM.instantiate()
+	room.set(&"show_debug_hud", true)
 	add_child(room)
 	_player = room.get_node("Player") as Player
-	_dummy_a = room.get_node("Enemies/DummyA") as DummyEnemy
-	_dummy_b = room.get_node("Enemies/DummyB") as DummyEnemy
+	_hopper = room.get_node("Enemies/PotHopper") as DummyEnemy
+	_daruma = room.get_node("Enemies/GrumbleDaruma") as DummyEnemy
 	_player.state_changed.connect(_on_state_changed)
 	_player.jumped.connect(_on_jumped)
 	_player.attack_landed.connect(_on_attack_landed)
@@ -64,31 +65,31 @@ func _run() -> void:
 	_log("  apex: tap %.1f px, hold %.1f px" % [tap_height, hold_height])
 	_check(hold_height > tap_height * 1.5, "holding jump should go clearly higher than a tap")
 
-	_section("run right to dummy A")
+	_section("run right to the pot hopper")
 	_press(&"move_right")
 	await _until(func() -> bool: return _player.global_position.x >= 176.0, "reach x>=176")
 	_release(&"move_right")
 	await _until(_is_grounded_idle, "stop")
 
-	_section("ground attack on dummy A")
-	var hits_before := _dummy_a.hits_taken
+	_section("ground attack on the pot hopper")
+	var hits_before := _hopper.hits_taken
 	await _tap(&"attack")
 	await _until(func() -> bool: return _player.state == Player.State.ATTACK, "attack starts")
 	await _until(func() -> bool: return _player.state != Player.State.ATTACK, "attack ends")
-	_check(_dummy_a.hits_taken > hits_before, "ground attack should hit dummy A")
+	_check(_hopper.hits_taken > hits_before, "ground attack should hit the pot hopper")
 
-	_section("jump-attack on dummy A (gamepad)")
+	_section("jump-attack on the pot hopper (gamepad)")
 	_press(&"jump", Device.GAMEPAD)
 	await _frames(2)
-	await _until(func() -> bool: return _player.velocity.y > 0.0 and _player.global_position.y >= 130.0, "descend to dummy height")
+	await _until(func() -> bool: return _player.velocity.y > 0.0 and _player.global_position.y >= 130.0, "descend to enemy height")
 	_release(&"jump", Device.GAMEPAD)
 	await _tap(&"attack", Device.GAMEPAD)
 	await _until(func() -> bool: return _player.state == Player.State.JUMP_ATTACK, "jump-attack starts")
 	await _until(_is_grounded_idle, "land after jump-attack")
 
-	_section("pogo down-strike on dummy A (keyboard: Down + X in the air)")
-	await _pogo_on(_dummy_a.global_position.x, 2, Device.KEYBOARD, func() -> int: return _dummy_bounces)
-	await _steer_until(182.0, _is_grounded_idle, "land beside dummy A")
+	_section("pogo down-strike on the pot hopper (keyboard: Down + X in the air)")
+	await _pogo_on(_hopper.global_position.x, 2, Device.KEYBOARD, _bounces_on.bind(_hopper))
+	await _steer_until(182.0, _is_grounded_idle, "land beside the pot hopper")
 	_release(&"move_down")
 
 	_section("coyote jump: walk off the ledge, press jump a few frames late")
@@ -115,16 +116,17 @@ func _run() -> void:
 	_release(&"jump")
 	await _until(_is_grounded_idle, "land")
 
-	_section("pogo down-strike on dummy B (gamepad: stick down + X)")
-	await _steer_until(_dummy_b.global_position.x, _is_grounded_idle_near.bind(_dummy_b.global_position.x), "stand under dummy B")
-	await _pogo_on(_dummy_b.global_position.x, 1, Device.GAMEPAD, func() -> int: return _dummy_bounces)
-	await _steer_until(304.0, _is_grounded_idle, "land left of dummy B")
+	_section("pogo down-strike on the grumble daruma (gamepad: stick down + X)")
+	var daruma_x := _daruma.global_position.x
+	await _steer_until(daruma_x, _is_grounded_idle_near.bind(daruma_x), "stand under the grumble daruma")
+	await _pogo_on(daruma_x, 1, Device.GAMEPAD, _bounces_on.bind(_daruma))
+	await _steer_until(304.0, _is_grounded_idle, "land left of the grumble daruma")
 	_release(&"move_down", Device.GAMEPAD)
 
 	_section("pogo down-strike on the spike strip (no damage)")
 	await _steer_until(336.0, _is_grounded_idle_near.bind(336.0), "stand left of the spikes")
 	var hearts_before := _player.hearts
-	await _pogo_on(364.0, 1, Device.KEYBOARD, func() -> int: return _spike_bounces)
+	await _pogo_on(368.0, 1, Device.KEYBOARD, func() -> int: return _spike_bounces)
 	await _steer_until(334.0, _is_grounded_idle, "land left of the spikes")
 	_release(&"move_down")
 	_check(_player.hearts == hearts_before, "pogo on spikes should not cost a heart")
@@ -172,6 +174,10 @@ func _jump_and_measure(hold_frames: int, device: Device) -> float:
 		await get_tree().physics_frame
 	_fail("land after measured jump")
 	return 0.0
+
+
+func _bounces_on(enemy: DummyEnemy) -> int:
+	return _enemy_bounces.get(enemy, 0)
 
 
 func _is_grounded_idle() -> bool:
@@ -288,7 +294,7 @@ func _on_attack_landed(target: Hittable) -> void:
 
 func _on_pogo_bounced(target: Area2D) -> void:
 	if target is DummyEnemy:
-		_dummy_bounces += 1
+		_enemy_bounces[target] = _bounces_on(target as DummyEnemy) + 1
 	else:
 		_spike_bounces += 1
 	_log("  POGO BOUNCE off %s at (%.0f, %.0f), vel.y now %.0f" % [
@@ -310,10 +316,11 @@ func _finish() -> void:
 		if _reached.has(value):
 			reached_names.append(_state_name(value))
 	print("states reached (%d/%d): %s" % [reached_names.size(), Player.State.size(), ", ".join(reached_names)])
-	print("pogo bounces: %d on dummies, %d on spikes" % [_dummy_bounces, _spike_bounces])
-	print("dummy hits: DummyA=%d DummyB=%d" % [_dummy_a.hits_taken, _dummy_b.hits_taken])
+	print("pogo bounces: PotHopper=%d GrumbleDaruma=%d spikes=%d" % [_bounces_on(_hopper), _bounces_on(_daruma), _spike_bounces])
+	print("enemy hits: PotHopper=%d GrumbleDaruma=%d" % [_hopper.hits_taken, _daruma.hits_taken])
 	_check(missing.is_empty(), "missing states: %s" % ", ".join(missing))
-	_check(_dummy_bounces > 0, "expected at least one pogo bounce on a dummy")
+	_check(_bounces_on(_hopper) > 0, "expected a pogo bounce on the pot hopper")
+	_check(_bounces_on(_daruma) > 0, "expected a pogo bounce on the grumble daruma")
 	if _failed:
 		return
 	print("RESULT: PASS")

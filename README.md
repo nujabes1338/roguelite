@@ -2,15 +2,16 @@
 
 Retro side-scrolling action roguelite in Godot 4.3+ / GDScript. This branch has
 only the **player controller prototype** (build-order step 2 of `plan_v2.md`):
-movement, sword, jump-attack and pogo on a greybox test room. The hero uses the
-locked knight sprites (idle and run). Dummies, level, and the sword/pogo blades
-are still coloured rectangles.
+movement, sword, jump-attack and pogo in a Hero Realm test room. The hero uses
+the locked knight sprites (idle and run). The room is a tile map with parallax
+backgrounds and two test enemies. Only the sword and pogo blades are still
+placeholder rectangles.
 
 ## Open and run
 
 1. Install **Godot 4.3 or newer** (standard build, not .NET).
 2. In the Project Manager, choose **Import** and pick this folder's `project.godot`.
-3. Press **F5**. The main scene is the greybox test room
+3. Press **F5**. The main scene is the test room
    (`scenes/rooms/greybox/test_room.tscn`).
 
 From the command line:
@@ -24,7 +25,8 @@ godot --headless --path . res://tests/walkthrough/player_walkthrough.tscn
 
 The walkthrough injects keyboard and gamepad events through the InputMap, drives
 the player through every state, prints each state transition, and fails unless
-all nine states are reached and a pogo bounce lands on a dummy.
+all nine states are reached and a pogo bounce lands on each test enemy. The
+walkthrough turns on a small debug HUD (state and hearts), which is off in normal play.
 
 ## Display
 
@@ -51,7 +53,7 @@ Bindings live in the InputMap (Project Settings > Input Map).
 - Ground attack and jump-attack are committed: a short startup, a few active
   frames, then recovery. You can't turn or steer during the ground attack, and
   the jump-attack keeps its momentum.
-- Pogo lasts until you land. Hitting a dummy or the spikes on the way down
+- Pogo lasts until you land. Hitting an enemy or the spikes on the way down
   bounces you up; spikes don't hurt you while you pogo on them.
 - Spikes cost 1 heart with knockback and brief invincibility. The pit kills
   instantly. Dead respawns you at the start with full hearts after a short delay.
@@ -117,6 +119,51 @@ bottom of the collision box. The feet are centred on frame x = 24, so
 `flip_h` for left-facing keeps them in place. States without art yet (jump,
 fall, attacks, pogo, hurt, dead) hold idle frame 0; hurt and dead tint it.
 
+## Test room
+
+`scenes/rooms/greybox/test_room.tscn` is 480x180 (30x11 tiles of 16 px), with
+the camera clamped to it. It keeps the greybox layout, snapped to the 16 px
+grid:
+
+- Floor top at y = 160, a 48 px pit at x 240-288 (kills, then respawn), and
+  wall columns at both ends. Invisible world boundaries above the wall columns
+  stop you from walking out of the room.
+- Three one-way wooden planks (jump up through them; no drop-through) at
+  x 48-96 / y 112, x 112-160 / y 80, and x 400-448 / y 128.
+- Spike tiles at x 352-384 on the floor: 1 heart plus knockback, and pogo-able.
+- Pot hopper at x 200 and grumble daruma at x 320. They are test dummies: no
+  AI, just hittable and pogo-able, showing their hurt frame and a flash for
+  0.2 s when struck.
+
+**Tiles:** `art/tiles/hero_realm/tileset.png` (index map in `tileset_map.txt`)
+and `hero_realm_tileset.tres`. Ground tiles are fully solid. Plank tiles have
+a one-way collider over their art rows 0-6. The spike tile has no collider; its
+`hazard_damage`, `hazard_pogoable` and `hazard_rect` custom data drive the
+hazard areas that `HazardTileLayer` (`src/world/hazard_tile_layer.gd`) creates
+at runtime. Spikes are not solid, so you're hurt by walking into them from the
+side or landing on them.
+
+**Backgrounds:** `art/backgrounds/hero_realm/` holds three 320x180 layers on
+`Parallax2D` nodes. All three loop horizontally, which keeps the slow sky from
+showing a gap at the room's right edge.
+
+| Layer | `scroll_scale.x` |
+|---|---|
+| `bg_sky` | 0.1 |
+| `bg_far` | 0.3 |
+| `bg_near` | 0.6 |
+
+**Enemies:** `art/enemies/<name>/` holds the 32x32 sheets (2-frame idle at 3
+fps, plus one hurt frame) and SpriteFrames. `data/enemies/<name>.tres`
+(`EnemyData`) holds the numbers:
+
+| Enemy | Hurtbox | Hurtbox centre (from feet) | Why |
+|---|---|---|---|
+| Pot hopper | 14 x 14 | (0, -13) | top edge on the green lid, 20 px above the feet |
+| Grumble daruma | 20 x 12 | (0, -20) | top edge on the green top, 26 px above the feet |
+
+The green top is the pogo surface, so each box's top edge sits on it.
+
 ## Layout
 
 Folders follow `plan_v2.md`. Empty folders are kept with `.gitkeep` until their
@@ -125,15 +172,20 @@ build step. This step adds:
 ```
 src/player/        player.gd, player.tscn, player_tuning.gd
 art/hero/knight/   idle.png, run.png, knight_sprite_frames.tres
-src/enemies/       hittable.gd (sword/pogo target base), dummy_enemy.gd
-src/world/         greybox_block.gd, hazard.gd (spikes, pit), physics_layers.gd
+art/tiles/hero_realm/        tileset.png, tileset_map.txt, hero_realm_tileset.tres
+art/backgrounds/hero_realm/  bg_sky.png, bg_far.png, bg_near.png
+art/enemies/<name>/          idle/hurt sheets + SpriteFrames
+src/enemies/       hittable.gd (sword/pogo target base), dummy_enemy.gd, enemy_data.gd
+src/world/         hazard.gd (spikes, pit), hazard_tile_layer.gd, physics_layers.gd
 data/player/       player_tuning.tres
+data/enemies/      pot_hopper.tres, grumble_daruma.tres
 scenes/rooms/greybox/  test_room.tscn (+ debug HUD script)
 tests/walkthrough/ scripted input pass
 ```
 
 `src/world/` and `data/player/` aren't in the plan's tree. They hold the
-room-building pieces and the player tuning data.
+room-building pieces and the player tuning data. The room scene still lives in
+`scenes/rooms/greybox/`, so its path hasn't changed.
 
 Physics layers: 1 world, 2 player, 3 enemy_hurtbox, 4 hazard. Sword, pogo and
 hazard checks use direct shape queries each physics frame, so hits register on
