@@ -1,15 +1,23 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://src/player/player.gd" id="1_player"]
 [ext_resource type="Resource" path="res://data/player/player_tuning.tres" id="2_tuning"]
+[ext_resource type="SpriteFrames" path="res://art/hero/knight/knight_sprite_frames.tres" id="3_frames"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
-size = Vector2(12, 24)
+size = Vector2(12, 32)
 
 [node name="Player" type="CharacterBody2D"]
 script = ExtResource("1_player")
 tuning = ExtResource("2_tuning")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(0, -12)
+position = Vector2(0, -16)
 shape = SubResource("RectangleShape2D_body")
+
+[node name="Sprite" type="AnimatedSprite2D" parent="."]
+show_behind_parent = true
+position = Vector2(0, -21)
+sprite_frames = ExtResource("3_frames")
+animation = &"idle"
+autoplay = "idle"

@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1_tuning")
-body_size = Vector2(12, 24)
+body_size = Vector2(12, 32)
 hurtbox_inset = 2.0
 run_speed = 100.0
 ground_acceleration = 900.0

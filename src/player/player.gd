@@ -1,8 +1,9 @@
 class_name Player
 extends CharacterBody2D
 ## Side-scrolling hero controller. The origin is at the feet (bottom centre).
-## Every feel constant comes from [member tuning]; visuals are placeholder
-## rectangles until the hero sprite is final.
+## Every feel constant comes from [member tuning]. Only idle and run have art so
+## far; other states hold the first idle frame, and the sword and pogo blades
+## are drawn as placeholder rectangles.
 
 signal state_changed(previous: State, current: State)
 signal jumped(used_coyote: bool, used_buffer: bool)
@@ -14,11 +15,8 @@ signal respawned
 
 enum State { IDLE, RUN, JUMP, FALL, ATTACK, JUMP_ATTACK, POGO, HURT, DEAD }
 
-const BODY_COLOR := Color("2fa8a0")
-const HURT_COLOR := Color("e05a5a")
-const DEAD_COLOR := Color("4a4a58")
-const HEADBAND_COLOR := Color("f2f2e8")
-const EYE_COLOR := Color("101018")
+const HURT_TINT := Color("ff8080")
+const DEAD_TINT := Color("60606c")
 const BLADE_COLOR := Color("ffe27a")
 const HILT_COLOR := Color("c08a3a")
 const MAX_QUERY_RESULTS := 8
@@ -40,6 +38,7 @@ var _query_shape := RectangleShape2D.new()
 var _query := PhysicsShapeQueryParameters2D.new()
 
 @onready var _collision: CollisionShape2D = $CollisionShape2D
+@onready var _sprite: AnimatedSprite2D = $Sprite
 
 
 func _ready() -> void:
@@ -84,6 +83,7 @@ func _physics_process(delta: float) -> void:
 		_after_move()
 
 	modulate.a = 0.35 if _invincible_timer > 0.0 and posmod(int(_invincible_timer * 15.0), 2) == 1 else 1.0
+	_update_sprite()
 	queue_redraw()
 
 
@@ -332,24 +332,32 @@ func _overlapping_areas(box_size: Vector2, local_center: Vector2, mask: int) -> 
 	return found
 
 
-func _draw() -> void:
-	var body := tuning.body_size
-	var color := BODY_COLOR
+func _update_sprite() -> void:
+	_sprite.flip_h = facing < 0
+	match state:
+		State.IDLE:
+			_sprite.play(&"idle")
+		State.RUN:
+			_sprite.play(&"run")
+		State.JUMP, State.FALL, State.ATTACK, State.JUMP_ATTACK, State.POGO, State.HURT, State.DEAD:
+			_sprite.animation = &"idle"
+			_sprite.frame = 0
+			_sprite.pause()
 	if state == State.HURT:
-		color = HURT_COLOR
+		_sprite.modulate = HURT_TINT
 	elif state == State.DEAD:
-		color = DEAD_COLOR
-	draw_rect(Rect2(Vector2(-body.x * 0.5, -body.y), body), color)
-	draw_rect(Rect2(-body.x * 0.5, -body.y + 3.0, body.x, 2.0), HEADBAND_COLOR)
-	var eye_x := body.x * 0.5 - 4.0 if facing > 0 else -body.x * 0.5 + 1.0
-	draw_rect(Rect2(eye_x, -body.y + 7.0, 3.0, 3.0), EYE_COLOR)
+		_sprite.modulate = DEAD_TINT
+	else:
+		_sprite.modulate = Color.WHITE
 
+
+func _draw() -> void:
 	if state == State.ATTACK or state == State.JUMP_ATTACK:
 		var offset := Vector2(tuning.attack_hitbox_offset.x * facing, tuning.attack_hitbox_offset.y)
 		if is_sword_active():
 			draw_rect(_centered_rect(tuning.attack_hitbox_size, offset), BLADE_COLOR)
 		else:
-			draw_rect(_centered_rect(Vector2(4.0, 3.0), Vector2(body.x * 0.5 * facing, offset.y)), HILT_COLOR)
+			draw_rect(_centered_rect(Vector2(4.0, 3.0), Vector2(tuning.body_size.x * 0.5 * facing, offset.y)), HILT_COLOR)
 	elif state == State.POGO:
 		draw_rect(_centered_rect(tuning.pogo_hitbox_size, tuning.pogo_hitbox_offset), BLADE_COLOR)
 

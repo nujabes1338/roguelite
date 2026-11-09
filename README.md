@@ -2,8 +2,9 @@
 
 Retro side-scrolling action roguelite in Godot 4.3+ / GDScript. This branch has
 only the **player controller prototype** (build-order step 2 of `plan_v2.md`):
-movement, sword, jump-attack and pogo on a greybox test room. The hero, dummies
-and level are coloured rectangles until the final art lands.
+movement, sword, jump-attack and pogo on a greybox test room. The hero uses the
+locked knight sprites (idle and run). Dummies, level, and the sword/pogo blades
+are still coloured rectangles.
 
 ## Open and run
 
@@ -69,7 +70,7 @@ Starting values (first pass, design will tune):
 
 | Group | Field | Value | Notes |
 |---|---|---|---|
-| Body | `body_size` | 12 x 24 | collision box, feet-anchored |
+| Body | `body_size` | 12 x 32 | collision box, feet-anchored; matches the knight art (feet 12 px wide, 35 px tall including hair spikes) |
 | | `hurtbox_inset` | 2 | hazard hurtbox is 2 px smaller per side |
 | Run | `run_speed` | 100 px/s | |
 | | `ground_acceleration` | 900 px/s² | full speed in about 0.11 s |
@@ -99,6 +100,23 @@ Starting values (first pass, design will tune):
 | | `invincibility_time` | 1.0 s | player blinks |
 | | `respawn_delay` | 0.8 s | |
 
+## Hero sprite
+
+`art/hero/knight/` holds `idle.png` (4 frames, frame 3 is the blink) and
+`run.png` (6 frames), both 48x48 per frame. `knight_sprite_frames.tres` defines
+the `idle` and `run` animations; their speeds are data there, not in code:
+
+| Animation | Speed | Frame durations | Cycle |
+|---|---|---|---|
+| `idle` | 5 fps | 2, 2, 2, 1 (blink is half length) | 1.4 s |
+| `run` | 10 fps | all 1 | 0.6 s |
+
+The `Sprite` node in `src/player/player.tscn` sits at (0, -21). That puts the
+bottom of frame row 44 (the lowest foot row) on the player origin, which is the
+bottom of the collision box. The feet are centred on frame x = 24, so
+`flip_h` for left-facing keeps them in place. States without art yet (jump,
+fall, attacks, pogo, hurt, dead) hold idle frame 0; hurt and dead tint it.
+
 ## Layout
 
 Folders follow `plan_v2.md`. Empty folders are kept with `.gitkeep` until their
@@ -106,6 +124,7 @@ build step. This step adds:
 
 ```
 src/player/        player.gd, player.tscn, player_tuning.gd
+art/hero/knight/   idle.png, run.png, knight_sprite_frames.tres
 src/enemies/       hittable.gd (sword/pogo target base), dummy_enemy.gd
 src/world/         greybox_block.gd, hazard.gd (spikes, pit), physics_layers.gd
 data/player/       player_tuning.tres
